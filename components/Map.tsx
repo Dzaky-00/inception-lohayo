@@ -40,6 +40,7 @@ onVote,
 usulanData?: any[];
 onVote?: (jumlahToken: number) => boolean;
 }) {
+const [isMounted, setIsMounted] = useState(false);
 const [newPin, setNewPin] = useState<L.LatLng | null>(null);
 const [judul, setJudul] = useState('');
 const [deskripsi, setDeskripsi] = useState('');
@@ -60,6 +61,7 @@ const fetchUsulan = async () => {
 };
 
 useEffect(() => {
+    setIsMounted(true);
     fetchUsulan();
 }, []);
 
@@ -156,9 +158,19 @@ const handleVoteToken = async (usulanId: number, currentToken: number, tokenTamb
     }
 };
 
+if (!isMounted) {
+    return (
+    <div
+        style={{ height: '600px', width: '100%' }}
+        className="rounded-xl z-0 shadow-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 font-medium text-sm"
+    >
+        Memuat Peta Desa...
+    </div>
+    );
+}
+
 return (
     <MapContainer
-    key="pantau-desa-map"
     center={[-7.250445, 112.768845]}
     zoom={13}
     style={{ height: '600px', width: '100%' }}

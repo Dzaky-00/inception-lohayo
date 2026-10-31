@@ -49,7 +49,7 @@ export default function Home() {
           <h2 className="text-xl font-bold text-gray-800">Sebaran Aspirasi Pembangunan</h2>
           <p className="text-xs text-gray-500">Klik titik mana saja di peta untuk mengusulkan perbaikan, atau alokasikan token suara pada pin yang ada.</p>
         </div>
-        <Map usulanData={[]} />
+        <Map usulanData={[]} onVote={handleVoteUsulan} />
         {/* Render Map */}
       </div>
     </AppShell>
