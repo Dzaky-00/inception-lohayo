@@ -1,19 +1,24 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import AppShell from '@/components/AppShell';
+import { Toaster } from 'react-hot-toast';
+
+// Pindahkan dynamic import ke luar fungsi Home agar instance Leaflet tidak bentrok
+const Map = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[600px] w-full bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 font-medium">
+      Memuat Peta Desa...
+    </div>
+  ),
+});
 
 export default function Home() {
   const [userToken, setUserToken] = useState(100);
 
-  const Map = useMemo(() => dynamic(
-    () => import('@/components/Map'),
-    { ssr: false, loading: () => <div className="h-[600px] w-full bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 font-medium">Memuat Peta Desa...</div> }
-  ), []);
-
   const handleVoteUsulan = (jumlahToken: number) => {
     if (userToken < jumlahToken) {
-      alert('Saldo token suara Anda tidak mencukupi!');
       return false;
     }
     setUserToken((prev) => prev - jumlahToken);
@@ -22,6 +27,10 @@ export default function Home() {
 
   return (
     <AppShell allowedRole="warga" userToken={userToken}>
+      {/* Container Toast untuk notifikasi Supabase */}
+      <Toaster position="top-right" />
+
+      {/* Banner Transparansi APBDes */}
       <section className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white py-4 px-6 shadow-inner">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
           <div>
@@ -40,6 +49,8 @@ export default function Home() {
           <h2 className="text-xl font-bold text-gray-800">Sebaran Aspirasi Pembangunan</h2>
           <p className="text-xs text-gray-500">Klik titik mana saja di peta untuk mengusulkan perbaikan, atau alokasikan token suara pada pin yang ada.</p>
         </div>
+        <Map usulanData={[]} />
+        {/* Render Map */}
       </div>
     </AppShell>
   );
