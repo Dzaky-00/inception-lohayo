@@ -1,0 +1,309 @@
+'use client';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+
+interface AppShellProps {
+children: React.ReactNode;
+allowedRole: 'warga' | 'admin' | 'superadmin';
+userToken?: number; // Khusus role warga
+}
+
+export default function AppShell({ children, allowedRole, userToken }: AppShellProps) {
+const router = useRouter();
+const pathname = usePathname();
+
+const [isAuthorized, setIsAuthorized] = useState(false);
+const [currentRole, setCurrentRole] = useState<'warga' | 'admin' | 'superadmin' | null>(null);
+const [identifier, setIdentifier] = useState('');
+
+// Kontrol Sidebar & Dropdown
+const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+const [isProfileOpen, setIsProfileOpen] = useState(false);
+const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+const notifRef = useRef<HTMLDivElement>(null);
+const profileRef = useRef<HTMLDivElement>(null);
+
+const [notifList, setNotifList] = useState([
+    { id: 1, text: 'Usulan baru: Perbaikan Selokan RT 04 masuk', time: '5 menit lalu', read: false },
+    { id: 2, text: 'Dukungan Penerangan Jalan Kenjeran mencapai 45 token', time: '1 jam lalu', read: false },
+]);
+
+// Validasi Otoritas Akses Ketat
+useEffect(() => {
+    const role = localStorage.getItem('pantau_role') as 'warga' | 'admin' | 'superadmin' | null;
+    const id = localStorage.getItem('pantau_identifier') || '';
+
+    if (!role) {
+    router.replace('/login');
+    return;
+    }
+
+    if (role !== allowedRole) {
+    // Jika mencoba membuka halaman milik role lain, arahkan ke dasbor perannya
+    if (role === 'warga') router.replace('/');
+    else if (role === 'admin') router.replace('/admin');
+    else if (role === 'superadmin') router.replace('/superadmin');
+    return;
+    }
+
+    setCurrentRole(role);
+    setIdentifier(id);
+    setIsAuthorized(true);
+}, [allowedRole, router]);
+
+// Tutup dropdown saat klik di luar pop-up
+useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+    if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+    }
+    if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+    }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
+
+// Web Audio API Alert Chime
+const playChime = () => {
+    try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+    } catch (e) {
+    console.error(e);
+    }
+};
+
+const handleLogout = () => {
+    localStorage.removeItem('pantau_role');
+    localStorage.removeItem('pantau_identifier');
+    router.replace('/login');
+};
+
+if (!isAuthorized) {
+    return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+    );
+}
+
+return (
+    <div className="min-h-screen bg-gray-50 flex overflow-x-hidden">
+    {/* Sidebar Terpadu */}
+    <aside
+        className={`bg-gray-900 text-white flex flex-col shrink-0 transition-all duration-300 ease-in-out ${
+        isSidebarOpen ? 'w-64' : 'w-0 -translate-x-full md:translate-x-0 md:w-0'
+        } overflow-hidden`}
+    >
+        <div className="p-5 border-b border-gray-800 flex items-center gap-3 w-64">
+        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/20 shrink-0">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+        </div>
+        <div>
+            <h2 className="text-lg font-bold text-white tracking-wide">Pantau Desa</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-gray-800 text-blue-400">
+            {currentRole === 'superadmin' ? 'Pusat Otoritas' : currentRole === 'admin' ? 'Panel Desa' : 'Akses Warga'}
+            </span>
+        </div>
+        </div>
+
+        {/* Menu Dinamis Berdasarkan Role */}
+        <nav className="flex-1 p-4 space-y-2 w-64">
+        {currentRole === 'warga' && (
+            <button
+            onClick={() => router.push('/')}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center gap-3 ${
+                pathname === '/' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
+            }`}
+            >
+            <span>🗺️</span> Peta Aspirasi & Usulan
+            </button>
+        )}
+
+        {currentRole === 'admin' && (
+            <>
+            <button
+                onClick={() => router.push('/admin')}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center gap-3 ${
+                pathname === '/admin' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
+                }`}
+            >
+                <span>📊</span> Dashboard Usulan
+            </button>
+            <button
+                onClick={() => router.push('/admin/pengaturan')}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center gap-3 ${
+                pathname === '/admin/pengaturan' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
+                }`}
+            >
+                <span>⚙️</span> Pengaturan Desa & Akun
+            </button>
+            </>
+        )}
+
+        {currentRole === 'superadmin' && (
+            <button
+            onClick={() => router.push('/superadmin')}
+            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center gap-3 ${
+                pathname === '/superadmin' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
+            }`}
+            >
+            <span>🏛️</span> Pengawasan Nasional
+            </button>
+        )}
+        </nav>
+
+        {/* Footer Sidebar */}
+        <div className="p-4 border-t border-gray-800 w-64 text-xs text-gray-400">
+        <p className="font-medium text-gray-300 truncate">{identifier}</p>
+        <p className="text-[10px] text-gray-500 capitalize">Sesi: {currentRole}</p>
+        </div>
+    </aside>
+
+    {/* Konten Utama */}
+    <div className="flex-1 flex flex-col min-w-0">
+        {/* Header Terpadu */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+            <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition focus:outline-none"
+            title="Buka/Tutup Sidebar"
+            >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            </button>
+            <span className="text-sm font-semibold text-gray-700 hidden sm:inline-block">
+            Pantau Desa — Platform Akuntabilitas & Musrenbang
+            </span>
+        </div>
+
+        <div className="flex items-center gap-4">
+            {/* Saldo Token Khusus Warga */}
+            {currentRole === 'warga' && userToken !== undefined && (
+            <div className="bg-blue-50 border border-blue-200 px-3.5 py-1.5 rounded-xl flex items-center gap-2">
+                <span className="text-sm">🪙</span>
+                <div>
+                <p className="text-[9px] text-blue-600 font-bold uppercase leading-tight">Hak Suara</p>
+                <p className="text-xs font-black text-blue-800 leading-tight">{userToken} Token</p>
+                </div>
+            </div>
+            )}
+
+            {/* Lonceng Notifikasi Universal */}
+            <div className="relative" ref={notifRef}>
+            <button
+                onClick={() => { setIsNotifOpen(!isNotifOpen); setIsProfileOpen(false); }}
+                className="relative p-2 rounded-full text-gray-600 hover:bg-gray-100 transition focus:outline-none"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {notifList.some((n) => !n.read) && (
+                <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+                )}
+            </button>
+
+            {isNotifOpen && (
+                <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-xl border border-gray-200 py-3 z-50">
+                <div className="px-4 pb-2 border-b border-gray-100 flex justify-between items-center">
+                    <p className="font-bold text-sm text-gray-800">Pemberitahuan</p>
+                    <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                        playChime();
+                        setNotifList((prev) => [
+                            { id: Date.now(), text: 'Ada aktivitas usulan baru terdaftar!', time: 'Baru saja', read: false },
+                            ...prev,
+                        ]);
+                        }}
+                        className="text-[11px] text-green-600 hover:underline"
+                    >
+                        + Uji Audio
+                    </button>
+                    <button
+                        onClick={() => setNotifList(notifList.map((n) => ({ ...n, read: true })))}
+                        className="text-[11px] text-blue-600 hover:underline"
+                    >
+                        Dibaca
+                    </button>
+                    </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+                    {notifList.map((n) => (
+                    <div key={n.id} className={`p-3 hover:bg-gray-50 transition cursor-pointer ${n.read ? 'opacity-60' : 'bg-blue-50/40'}`}>
+                        <p className="text-xs text-gray-800 leading-snug font-medium">{n.text}</p>
+                        <span className="text-[10px] text-gray-400 mt-1 block">{n.time}</span>
+                    </div>
+                    ))}
+                </div>
+                </div>
+            )}
+            </div>
+
+            {/* Menu Akun & Keluar */}
+            <div className="relative" ref={profileRef}>
+            <button
+                onClick={() => { setIsProfileOpen(!isProfileOpen); setIsNotifOpen(false); }}
+                className="flex items-center gap-2.5 focus:outline-none"
+            >
+                <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-gray-800 truncate max-w-[140px]">{identifier}</p>
+                <p className="text-[10px] text-gray-500 capitalize">{currentRole}</p>
+                </div>
+                <div className={`h-9 w-9 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-xs ${
+                currentRole === 'superadmin' ? 'bg-indigo-600' : currentRole === 'admin' ? 'bg-gray-800' : 'bg-blue-600'
+                }`}>
+                {currentRole === 'superadmin' ? 'SA' : currentRole === 'admin' ? 'AD' : 'WG'}
+                </div>
+            </button>
+
+            {isProfileOpen && (
+                <div className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                <div className="px-4 py-2 border-b border-gray-100 sm:hidden">
+                    <p className="text-xs font-bold text-gray-800 truncate">{identifier}</p>
+                    <p className="text-[10px] text-gray-500 capitalize">{currentRole}</p>
+                </div>
+                <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 transition flex items-center gap-2"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Keluar (Logout)
+                </button>
+                </div>
+            )}
+            </div>
+        </div>
+        </header>
+
+        {/* Konten Halaman */}
+        <main className="flex-1">{children}</main>
+    </div>
+    </div>
+);
+}
