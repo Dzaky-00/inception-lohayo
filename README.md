@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏛️ Pantau Desa
 
-## Getting Started
+> **Platform WebGIS Participatory Budgeting & Akuntabilitas APBDes Terpadu Tiga Tingkat Peran (Warga, Admin Desa, Otoritas Super Admin)**
 
-First, run the development server:
+Pantau Desa adalah platform transparansi dan pengawasan partisipatif pembangunan desa berbasis spasial (WebGIS). Platform ini mengintegrasikan pemetaan lokasi usulan warga secara *real-time*, dompet hak suara berbasis *quadratic voting*, tata kelola alokasi dana desa (APBDes), serta integrasi master data kependudukan dan perbendaharaan negara.
+
+---
+
+## 🌟 Fitur Utama
+
+1. **Akses Warga (`/`):**
+   - Eksplorasi peta interaktif WebGIS berbasis Leaflet & PostGIS `POINT(lng lat)`.
+   - Pengajuan aspirasi & laporan fisik infrastruktur dengan bukti foto langsung ke Supabase Storage.
+   - Dompet hak suara digital (*Quadratic Voting Tokens*) untuk menentukan prioritas usulan pembangunan.
+   - Bilah transparansi realisasi pagu anggaran APBDes berjalan.
+
+2. **Admin Desa (`/admin`):**
+   - Tata kelola alokasi pagu APBDes 2 pos utama: **Dana Pembangunan** & **Dana Darurat**.
+   - Pengunggahan bukti serapan multi-format (foto baliho, nota belanja, berkas LPJ PDF).
+   - Validasi dan moderasi usulan warga desa setempat.
+   - Sistem notifikasi audio *alert chime* berbasis Web Audio API.
+
+3. **Super Admin / Otoritas Pusat (`/superadmin`):**
+   - Konsolidasi makro pagu anggaran APBDes nasional dan metrik partisipasi warga.
+   - Integrasi REST API Gateway Kemendagri (SIAK Kependudukan) & Kemenkeu (OMSPAN Perbendaharaan).
+   - Penarikan dan pendaftaran entitas desa baru secara terpadu (*auto-fill* kodefikasi wilayah).
+   - Manajemen profil entitas desa, penyesuaian status aktif/nonaktif, dan *reset* sandi dinas.
+   - Panel pengaturan *branding* visual dinamis di Supabase (`/superadmin/pengaturan`).
+
+---
+
+## 🚀 Menjalankan Proyek Secara Lokal
+
+Pastikan Anda telah memasang **Node.js** (v18+) dan paket manajer **npm** / **pnpm**.
 
 ```bash
+# 1. Klon repositori
+git clone https://github.com/<username>/pantau-desa.git
+cd pantau-desa
+
+# 2. Pasang dependensi
+npm install
+
+# 3. Konfigurasi Environment Variables (.env.local)
+# NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# 4. Jalankan server pengembangan
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000) pada peramban Anda.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## AI Use Declaration
 
-## Learn More
+Dalam pengembangan proyek **Pantau Desa**, Artificial Intelligence (Large Language Models) digunakan sebagai asisten komputasi dan *co-pilot* untuk:
+- Eksplorasi arsitektur geospasial WebGIS dan isolasi render komponen *client-side* Leaflet di Next.js App Router.
+- Penyusunan struktur dokumen teknis dan penanganan *debugging* integrasi PostGIS serta mitigasi *event bubbling* pada DOM.
+- Seluruh logika bisnis, arsitektur data multi-tenant, dan integrasi akhir divalidasi serta diuji secara mandiri oleh tim pengembang.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Third-Party Declaration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Proyek ini memanfaatkan beberapa pustaka dan layanan pihak ketiga:
+- **Framework & Runtime:** Next.js (React), TypeScript, Node.js
+- **Styling:** Tailwind CSS
+- **Pemetaan & WebGIS:** Leaflet.js, React-Leaflet, OpenStreetMap Tile Layer
+- **Backend as a Service:** Supabase (PostgreSQL Database, PostGIS Extension, Supabase Storage)
+- **UI Components & Notifikasi:** React Hot Toast
+- **Hosting & Deployment:** Vercel Inc.
