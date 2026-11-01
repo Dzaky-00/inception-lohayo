@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AppShell from '@/components/AppShell';
 
 interface DesaItem {
@@ -14,6 +14,74 @@ interface DesaItem {
   wargaAktif: number;
   statusApi: 'Aktif Terhubung' | 'Sinkronisasi Ulang' | 'Nonaktif';
 }
+
+interface ApiDesaMaster {
+  kodeWilayah: string;
+  nama: string;
+  kec: string;
+  kab: string;
+  paguOmspan: number;
+  dptSiak: number;
+  emailRekomendasi: string;
+}
+
+// Master Data Gateway Wilayah Kemendagri & Kemenkeu OMSPAN (Katalog Layanan API Nasional)
+const MASTER_API_KEMENDAGRI: ApiDesaMaster[] = [
+  {
+    kodeWilayah: '35.78.01.2001',
+    nama: 'Desa Keputih',
+    kec: 'Sukolilo',
+    kab: 'Surabaya',
+    paguOmspan: 2350000000,
+    dptSiak: 5210,
+    emailRekomendasi: 'admin.keputih@desa.id',
+  },
+  {
+    kodeWilayah: '35.78.02.2002',
+    nama: 'Desa Rungkut Kidul',
+    kec: 'Rungkut',
+    kab: 'Surabaya',
+    paguOmspan: 2150000000,
+    dptSiak: 4650,
+    emailRekomendasi: 'admin.rungkutkidul@desa.id',
+  },
+  {
+    kodeWilayah: '35.15.08.2004',
+    nama: 'Desa Wadungasri',
+    kec: 'Waru',
+    kab: 'Sidoarjo',
+    paguOmspan: 2680000000,
+    dptSiak: 6340,
+    emailRekomendasi: 'admin.wadungasri@desa.id',
+  },
+  {
+    kodeWilayah: '35.15.12.2006',
+    nama: 'Desa Sedati Gede',
+    kec: 'Sedati',
+    kab: 'Sidoarjo',
+    paguOmspan: 2220000000,
+    dptSiak: 4980,
+    emailRekomendasi: 'admin.sedatigede@desa.id',
+  },
+  {
+    kodeWilayah: '35.25.04.2003',
+    nama: 'Desa Suci',
+    kec: 'Manyar',
+    kab: 'Gresik',
+    paguOmspan: 2450000000,
+    dptSiak: 5800,
+    emailRekomendasi: 'admin.suci@desa.id',
+  },
+  {
+    kodeWilayah: '35.07.15.2001',
+    nama: 'Desa Pujon Kidul',
+    kec: 'Pujon',
+    kab: 'Malang',
+    paguOmspan: 1950000000,
+    dptSiak: 4120,
+    emailRekomendasi: 'admin.pujonkidul@desa.id',
+  },
+];
 
 const INITIAL_DESA: DesaItem[] = [
   {
@@ -110,8 +178,12 @@ export default function SuperAdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedDesa, setSelectedDesa] = useState<DesaItem | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [selectedApiKode, setSelectedApiKode] = useState('');
 
   const [formDesa, setFormDesa] = useState({
+    kodeKemendagri: '',
     nama: '',
     kec: '',
     kab: '',
@@ -120,6 +192,17 @@ export default function SuperAdminPage() {
     paguAnggaran: '2000000000',
     totalWargaDpt: '4000',
   });
+
+  // Kunci scroll background saat salah satu pop-up modal dibuka
+  useEffect(() => {
+    if (selectedDesa || isModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow || 'unset';
+      };
+    }
+  }, [selectedDesa, isModalOpen]);
 
   // Kalkulasi Metrik Agregasi Nasional (Realtime)
   const totalDesa = daftarDesa.length;
@@ -176,9 +259,26 @@ export default function SuperAdminPage() {
     }, 1200);
   };
 
+  const handlePilihApiDesa = (kode: string) => {
+    setSelectedApiKode(kode);
+    const found = MASTER_API_KEMENDAGRI.find((m) => m.kodeWilayah === kode);
+    if (found) {
+      setFormDesa({
+        kodeKemendagri: found.kodeWilayah,
+        nama: found.nama,
+        kec: found.kec,
+        kab: found.kab,
+        emailAdmin: found.emailRekomendasi,
+        passAdmin: 'Desa2026!*',
+        paguAnggaran: found.paguOmspan.toString(),
+        totalWargaDpt: found.dptSiak.toString(),
+      });
+    }
+  };
+
   const handleTambahDesa = (e: React.FormEvent) => {
     e.preventDefault();
-    const idBaru = `DS-00${daftarDesa.length + 1}`;
+    const idBaru = formDesa.kodeKemendagri || `DS-00${daftarDesa.length + 1}`;
     const paguNum = parseInt(formDesa.paguAnggaran, 10) || 0;
     const dptNum = parseInt(formDesa.totalWargaDpt, 10) || 1000;
 
@@ -197,7 +297,9 @@ export default function SuperAdminPage() {
 
     setDaftarDesa((prev) => [...prev, newDesa]);
     setIsModalOpen(false);
+    setSelectedApiKode('');
     setFormDesa({
+      kodeKemendagri: '',
       nama: '',
       kec: '',
       kab: '',
@@ -206,7 +308,26 @@ export default function SuperAdminPage() {
       paguAnggaran: '2000000000',
       totalWargaDpt: '4000',
     });
-    alert(`Entitas wilayah ${newDesa.nama} berhasil diterbitkan dengan alokasi pagu ${formatRupiahRingkas(paguNum)}!`);
+    alert(`Entitas wilayah ${newDesa.nama} (${newDesa.id}) berhasil diterbitkan dari integrasi gateway!`);
+  };
+
+  const handleResetPasswordDesa = () => {
+    if (!newPasswordInput || newPasswordInput.length < 6) {
+      alert('Kata sandi baru minimal 6 karakter!');
+      return;
+    }
+    alert(`Kata sandi akun dinas ${selectedDesa?.adminEmail} berhasil diperbarui!`);
+    setNewPasswordInput('');
+  };
+
+  const handleToggleStatusDesa = () => {
+    if (!selectedDesa) return;
+    const newStatus = selectedDesa.statusApi === 'Nonaktif' ? 'Aktif Terhubung' : 'Nonaktif';
+    setDaftarDesa((prev) =>
+      prev.map((d) => (d.id === selectedDesa.id ? { ...d, statusApi: newStatus } : d))
+    );
+    setSelectedDesa((prev) => (prev ? { ...prev, statusApi: newStatus } : null));
+    alert(`Status entitas ${selectedDesa.nama} kini "${newStatus}".`);
   };
 
   return (
@@ -390,25 +511,22 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* Tabel Konten */}
+          {/* Tabel Konten (5 Kolom Bersih & Rapi) */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-100/70 text-gray-600 border-b border-gray-200">
-                  <th className="p-3.5 font-bold">Kode</th>
-                  <th className="p-3.5 font-bold">Nama Desa</th>
-                  <th className="p-3.5 font-bold">Wilayah</th>
-                  <th className="p-3.5 font-bold">Pagu APBDes</th>
-                  <th className="p-3.5 font-bold">Serapan Dana</th>
-                  <th className="p-3.5 font-bold">Partisipasi Warga Aktif</th>
-                  <th className="p-3.5 font-bold">Akun Dinas Admin</th>
-                  <th className="p-3.5 font-bold">Status Desa</th>
+                  <th className="p-4 font-bold">Desa & Wilayah</th>
+                  <th className="p-4 font-bold">Pagu & Serapan APBDes</th>
+                  <th className="p-4 font-bold">Partisipasi Warga</th>
+                  <th className="p-4 font-bold">Status Integrasi</th>
+                  <th className="p-4 font-bold text-right">Aksi Otoritas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredDesa.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-400">
+                    <td colSpan={5} className="p-8 text-center text-gray-400">
                       Tidak ada entitas desa yang cocok dengan kriteria pencarian.
                     </td>
                   </tr>
@@ -419,57 +537,50 @@ export default function SuperAdminPage() {
 
                     return (
                       <tr key={d.id} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="p-3.5 font-mono text-gray-500 font-semibold">{d.id}</td>
-                        <td className="p-3.5 font-bold text-gray-900">{d.nama}</td>
-                        <td className="p-3.5 text-gray-600">
-                          {d.kec}, {d.kab}
-                        </td>
-                        <td className="p-3.5 font-bold text-gray-800">{formatRupiahRingkas(d.paguAnggaran)}</td>
-                        <td className="p-3.5">
-                          <div>
-                            <span className="font-semibold text-emerald-600">
-                              {formatRupiahRingkas(d.serapanNominal)}
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                              {d.id}
                             </span>
-                            <span className="text-[10px] text-gray-400 block">{persenSerapanDesa}% terealisasi</span>
+                            <span className="font-bold text-gray-900 text-sm">{d.nama}</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            Kec. {d.kec}, Kab. {d.kab}
+                          </p>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-bold text-gray-900 text-xs">
+                            {formatRupiahRingkas(d.paguAnggaran)}
+                          </div>
+                          <div className="text-[11px] text-emerald-600 font-medium mt-0.5">
+                            Serapan: {formatRupiahRingkas(d.serapanNominal)} ({persenSerapanDesa}%)
                           </div>
                         </td>
-                        <td className="p-3.5 min-w-[180px]">
-                          <div>
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="font-bold text-gray-800">
-                                {d.wargaAktif.toLocaleString('id-ID')} Warga
-                              </span>
-                              <span
-                                className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${
-                                  persenDesa >= 60
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : persenDesa >= 40
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {persenDesa}% Aktif
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-[width] duration-500 ${
-                                  persenDesa >= 60
-                                    ? 'bg-emerald-500'
-                                    : persenDesa >= 40
-                                    ? 'bg-indigo-500'
-                                    : 'bg-amber-500'
-                                }`}
-                                style={{ width: `${persenDesa}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-[10px] text-gray-400 mt-0.5 block">
-                              dari {d.totalWargaDpt.toLocaleString('id-ID')} DPT
+                        <td className="p-4 min-w-[160px]">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-bold text-gray-800">
+                              {d.wargaAktif.toLocaleString('id-ID')} Warga
+                            </span>
+                            <span
+                              className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${
+                                persenDesa >= 60
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : persenDesa >= 40
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {persenDesa}% DPT
                             </span>
                           </div>
+                          <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-indigo-600 transition-[width] duration-300"
+                              style={{ width: `${persenDesa}%` }}
+                            ></div>
+                          </div>
                         </td>
-                        <td className="p-3.5 font-mono text-gray-600 text-[11px]">{d.adminEmail}</td>
-                        <td className="p-3.5">
+                        <td className="p-4">
                           <span
                             className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-block border ${
                               d.statusApi === 'Aktif Terhubung'
@@ -482,6 +593,14 @@ export default function SuperAdminPage() {
                             {d.statusApi}
                           </span>
                         </td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => setSelectedDesa(d)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg transition-colors border border-indigo-200"
+                          >
+                            <span>🔍</span> Buka Profil Desa
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -491,118 +610,361 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {/* Modal Daftarkan Desa Baru */}
+        {/* Modal Daftarkan Desa Baru (Integrasi Gateway Otomatis) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white border border-gray-200 w-full max-w-md rounded-2xl p-6 shadow-2xl">
-              <h3 className="text-base font-bold text-gray-800 mb-1">Daftarkan Entitas Desa Baru</h3>
-              <p className="text-xs text-gray-500 mb-4">
-                Input data wilayah untuk menerbitkan akun admin dan menetapkan pagu APBDes.
-              </p>
-              <form onSubmit={handleTambahDesa} className="space-y-3">
+            <div className="bg-white border border-gray-200 w-full max-w-lg rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+              {/* Header Pinned di Atas dengan Tombol Silang Tunggal */}
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0 bg-white z-10">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nama Desa</label>
-                  <input
-                    type="text"
-                    required
-                    value={formDesa.nama}
-                    onChange={(e) => setFormDesa({ ...formDesa, nama: e.target.value })}
-                    placeholder="Mis: Desa Sumberrejo"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <h3 className="text-base font-bold text-gray-900">Daftarkan Entitas Desa Baru</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Integrasi REST API Gateway Kemendagri (SIAK) & Kemenkeu (OMSPAN).
+                  </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Kecamatan</label>
-                    <input
-                      type="text"
-                      required
-                      value={formDesa.kec}
-                      onChange={(e) => setFormDesa({ ...formDesa, kec: e.target.value })}
-                      placeholder="Kenjeran"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
-                    />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setSelectedApiKode('');
+                  }}
+                  className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 p-2 rounded-xl transition text-base font-bold leading-none shrink-0"
+                  title="Tutup Modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body Form yang Bisa Di-scroll Halus */}
+              <div className="p-6 overflow-y-auto flex-1 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                {/* Gateway Auto-Pull Dropdown */}
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-3.5 mb-5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-bold text-indigo-950 uppercase flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Tarik Otomatis dari Gateway Instansi Terhubung
+                    </label>
+                    <span className="text-[10px] bg-indigo-100 text-indigo-700 font-mono font-bold px-2 py-0.5 rounded">
+                      Kemendagri & Kemenkeu
+                    </span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Kabupaten/Kota</label>
-                    <input
-                      type="text"
-                      required
-                      value={formDesa.kab}
-                      onChange={(e) => setFormDesa({ ...formDesa, kab: e.target.value })}
-                      placeholder="Surabaya"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
-                    />
-                  </div>
+                  <select
+                    value={selectedApiKode}
+                    onChange={(e) => handlePilihApiDesa(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- Pilih Wilayah dari Master Data Nasional (Auto-Fill) --</option>
+                    {MASTER_API_KEMENDAGRI.map((item) => (
+                      <option key={item.kodeWilayah} value={item.kodeWilayah}>
+                        [{item.kodeWilayah}] {item.nama} — Kec. {item.kec}, {item.kab}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-indigo-700/80 mt-1.5">
+                    💡 Memilih desa dari gateway akan menarik otomatis DPT dari SIAK Dukcapil & Pagu dari OMSPAN Kemenkeu.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <form onSubmit={handleTambahDesa} className="space-y-4">
+                  {formDesa.kodeKemendagri && (
+                    <div className="bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-lg flex items-center justify-between text-xs">
+                      <span className="text-emerald-800 font-medium">
+                        Kodefikasi Wilayah Resmi Kemendagri:
+                      </span>
+                      <strong className="font-mono font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                        {formDesa.kodeKemendagri}
+                      </strong>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Nama Desa</label>
+                    <input
+                      type="text"
+                      required
+                      value={formDesa.nama}
+                      onChange={(e) => setFormDesa({ ...formDesa, nama: e.target.value })}
+                      placeholder="Mis: Desa Sukamakmur"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Kecamatan</label>
+                      <input
+                        type="text"
+                        required
+                        value={formDesa.kec}
+                        onChange={(e) => setFormDesa({ ...formDesa, kec: e.target.value })}
+                        placeholder="Kenjeran"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Kabupaten/Kota</label>
+                      <input
+                        type="text"
+                        required
+                        value={formDesa.kab}
+                        onChange={(e) => setFormDesa({ ...formDesa, kab: e.target.value })}
+                        placeholder="Surabaya"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                        Pagu APBDes Siap Salur (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min={100000000}
+                        step={50000000}
+                        value={formDesa.paguAnggaran}
+                        onChange={(e) => setFormDesa({ ...formDesa, paguAnggaran: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                        DPT Kependudukan (Jiwa)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min={100}
+                        value={formDesa.totalWargaDpt}
+                        onChange={(e) => setFormDesa({ ...formDesa, totalWargaDpt: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                      Pagu APBDes Awal (Rp)
+                      Email Dinas Admin Desa
                     </label>
                     <input
-                      type="number"
+                      type="email"
                       required
-                      min={100000000}
-                      step={50000000}
-                      value={formDesa.paguAnggaran}
-                      onChange={(e) => setFormDesa({ ...formDesa, paguAnggaran: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
+                      value={formDesa.emailAdmin}
+                      onChange={(e) => setFormDesa({ ...formDesa, emailAdmin: e.target.value })}
+                      placeholder="admin.sukamakmur@desa.id"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Total DPT Warga</label>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                      Kata Sandi Awal Akun Dinas
+                    </label>
                     <input
-                      type="number"
+                      type="password"
                       required
-                      min={100}
-                      value={formDesa.totalWargaDpt}
-                      onChange={(e) => setFormDesa({ ...formDesa, totalWargaDpt: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
+                      value={formDesa.passAdmin}
+                      onChange={(e) => setFormDesa({ ...formDesa, passAdmin: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                     />
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                    >
+                      Terbitkan Akun Dinas & Alokasi Pagu
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Profil & Kelola Desa (Clean Administrative Header & Single Pinned Close Button) */}
+        {selectedDesa && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div className="bg-white border border-gray-200 w-full max-w-2xl rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+              {/* 1. Header Profil Administratif (Pinned di Atas, Tombol Silang Tetap Mengikuti) */}
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0 bg-white z-10">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-md border border-gray-200">
+                      {selectedDesa.id}
+                    </span>
+                    <h3 className="text-lg font-bold text-gray-900">{selectedDesa.nama}</h3>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        selectedDesa.statusApi === 'Aktif Terhubung'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : selectedDesa.statusApi === 'Sinkronisasi Ulang'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-gray-100 text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      {selectedDesa.statusApi}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Kecamatan {selectedDesa.kec}, Kabupaten/Kota {selectedDesa.kab} • Akun Dinas:{' '}
+                    <span className="font-mono font-medium text-gray-700">{selectedDesa.adminEmail}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedDesa(null)}
+                  className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 p-2 rounded-xl transition text-base font-bold leading-none shrink-0"
+                  title="Tutup Modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 2. Body Konten (Scroll Halus dengan Scrollbar Bersih) */}
+              <div className="p-6 overflow-y-auto flex-1 space-y-6 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                {/* Rincian Pagu Dana Desa (100% Tersalurkan, Terbagi 2 Pos: Pembangunan & Darurat) */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                        Alokasi Pagu APBDes TA 2026 (100% Tersalurkan)
+                      </h4>
+                      <p className="text-[11px] text-gray-500">
+                        Pagu telah cair penuh dari pusat dan dibagi ke dalam 2 pos anggaran utama desa.
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-base font-black text-indigo-700">
+                        {formatRupiahRingkas(selectedDesa.paguAnggaran)}
+                      </span>
+                      <span className="block text-[10px] text-gray-400">Total Pagu Siap Salur</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Pos 1: Dana Pembangunan (70%) */}
+                    <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-blue-900">1. Dana Pembangunan (70%)</span>
+                        <span className="text-xs font-mono font-bold text-blue-700">
+                          {formatRupiahRingkas(selectedDesa.paguAnggaran * 0.7)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-blue-800/80 leading-relaxed">
+                        Diperuntukkan untuk proyek fisik, perbaikan jalan, selokan, dan infrastruktur hasil voting warga di WebGIS.
+                      </p>
+                      <div className="mt-3 pt-2 border-t border-blue-200/60 flex justify-between items-center text-[10px]">
+                        <span className="text-blue-700">Realisasi Serapan Berjalan:</span>
+                        <strong className="text-blue-950 font-bold">{formatRupiahRingkas(selectedDesa.serapanNominal)}</strong>
+                      </div>
+                    </div>
+
+                    {/* Pos 2: Dana Darurat (30%) */}
+                    <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-amber-900">2. Dana Darurat (30%)</span>
+                        <span className="text-xs font-mono font-bold text-amber-700">
+                          {formatRupiahRingkas(selectedDesa.paguAnggaran * 0.3)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-amber-800/80 leading-relaxed">
+                        Pos dana cadangan tanggap darurat bencana alam, krisis pangan, atau kejadian mendesak yang butuh penanganan instan.
+                      </p>
+                      <div className="mt-3 pt-2 border-t border-amber-200/60 flex justify-between items-center text-[10px]">
+                        <span className="text-amber-700">Status Saldo Cadangan:</span>
+                        <strong className="text-emerald-700 font-bold">Siap Pakai (Tersimpan di RKD)</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
-                    Email Dinas Admin Desa
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={formDesa.emailAdmin}
-                    onChange={(e) => setFormDesa({ ...formDesa, emailAdmin: e.target.value })}
-                    placeholder="admin.sumberrejo@desa.id"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
-                  />
+                {/* Metrik Partisipasi & SIAK Kependudukan */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                    Status Partisipasi Warga & Integrasi SIAK Kemendagri
+                  </h4>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">DPT SIAK</p>
+                      <p className="text-sm font-bold text-gray-900 mt-0.5">
+                        {selectedDesa.totalWargaDpt.toLocaleString('id-ID')}
+                      </p>
+                      <span className="text-[9px] text-gray-400">Jiwa Terdaftar</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">Warga Aktif</p>
+                      <p className="text-sm font-bold text-indigo-600 mt-0.5">
+                        {selectedDesa.wargaAktif.toLocaleString('id-ID')}
+                      </p>
+                      <span className="text-[9px] text-gray-400">Punya Token Suara</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">Rasio Partisipasi</p>
+                      <p className="text-sm font-bold text-emerald-600 mt-0.5">
+                        {Math.round((selectedDesa.wargaAktif / selectedDesa.totalWargaDpt) * 100)}%
+                      </p>
+                      <span className="text-[9px] text-emerald-600 font-semibold">Tercatat Aktif</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">Kata Sandi Awal</label>
-                  <input
-                    type="password"
-                    required
-                    value={formDesa.passAdmin}
-                    onChange={(e) => setFormDesa({ ...formDesa, passAdmin: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
-                  />
+
+                {/* Kontrol Akses & Kredensial Admin Desa */}
+                <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                    Tata Kelola Otoritas & Kredensial Desa
+                  </h4>
+
+                  <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                    <div className="w-full sm:w-auto">
+                      <p className="text-xs font-medium text-gray-700">Reset Kata Sandi Admin Desa</p>
+                      <p className="text-[11px] text-gray-500">
+                        Terbitkan kata sandi baru jika perangkat desa setempat mengalami kendala login.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <input
+                        type="password"
+                        placeholder="Kata sandi baru..."
+                        value={newPasswordInput}
+                        onChange={(e) => setNewPasswordInput(e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-44"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleResetPasswordDesa}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition whitespace-nowrap"
+                      >
+                        Reset Sandi
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">Status Operasional Entitas</p>
+                      <p className="text-[11px] text-gray-500">
+                        Nonaktifkan desa jika dalam evaluasi atau terjadi pelanggaran administrasi.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleStatusDesa}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                        selectedDesa.statusApi === 'Nonaktif'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+                      }`}
+                    >
+                      {selectedDesa.statusApi === 'Nonaktif'
+                        ? 'Aktifkan Kembali Desa'
+                        : 'Bekukan / Nonaktifkan Desa'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-800"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition"
-                  >
-                    Terbitkan Akun & Pagu
-                  </button>
-                </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
