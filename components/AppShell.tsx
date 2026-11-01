@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppConfig } from '@/components/ConfigContext';
+import SimulationCalendarBar from '@/components/SimulationCalendarBar';
+import { getMusrenbangConfig } from './musrenbangConfig';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -16,6 +18,7 @@ export default function AppShell({ children, allowedRole, userToken }: AppShellP
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [currentRole, setCurrentRole] = useState<'warga' | 'admin' | 'superadmin' | null>(null);
   const [identifier, setIdentifier] = useState('');
+  const [faseAktif, setFaseAktif] = useState<number>(1);
 
   // Konfigurasi Global Dinamis terpusat dari Server-Side Rendering (SSR)
   const { config } = useAppConfig();
@@ -87,6 +90,18 @@ export default function AppShell({ children, allowedRole, userToken }: AppShellP
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+// Sinkronisasi Fase Aktif untuk Navigasi Cerdas
+useEffect(() => {
+    setFaseAktif(getMusrenbangConfig().faseAktif);
+    const handleConfigChange = () => setFaseAktif(getMusrenbangConfig().faseAktif);
+    window.addEventListener('musrenbang_config_changed', handleConfigChange);
+    window.addEventListener('pantau_simulated_date_changed', handleConfigChange);
+    return () => {
+        window.removeEventListener('musrenbang_config_changed', handleConfigChange);
+        window.removeEventListener('pantau_simulated_date_changed', handleConfigChange);
+    };
+}, []);
 
   const playChime = () => {
     try {
@@ -181,8 +196,23 @@ export default function AppShell({ children, allowedRole, userToken }: AppShellP
                 }`}
               >
                 <span>📊</span> Dashboard Usulan
-              </button>
-              <button
+            </button>
+            <button
+                onClick={() => router.push('/admin/peringkat')}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition flex items-center justify-between ${
+                pathname === '/admin/peringkat' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
+                }`}
+            >
+                <div className="flex items-center gap-3">
+                  <span>🏆</span> Papan Peringkat
+                </div>
+                {faseAktif < 3 && (
+                  <span className="text-[10px] bg-gray-800 text-amber-400 font-bold px-1.5 py-0.5 rounded border border-gray-700">
+                    Fase 3
+                  </span>
+                )}
+            </button>
+            <button
                 onClick={() => router.push('/admin/pengaturan')}
                 className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${
                   pathname === '/admin/pengaturan' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-300 hover:bg-gray-800'
@@ -222,8 +252,12 @@ export default function AppShell({ children, allowedRole, userToken }: AppShellP
           isSidebarOpen ? 'md:ml-64' : 'ml-0'
         }`}
       >
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-20 shrink-0">
-          <div className="flex items-center gap-3">
+        {/* Bar Simulasi Kalender Musrenbang */}
+        <SimulationCalendarBar />
+
+        {/* Header Terpadu */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40">
+        <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
@@ -233,7 +267,41 @@ export default function AppShell({ children, allowedRole, userToken }: AppShellP
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-          </div>
+            <span className="text-sm font-semibold text-gray-700 hidden sm:inline-block">
+            Pantau Desa — Platform Akuntabilitas & Musrenbang
+            </span>
+
+            {/* Navigasi Cepat Admin di Navbar */}
+            {currentRole === 'admin' && (
+              <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
+                <button
+                  onClick={() => router.push('/admin')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    pathname === '/admin'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>📊</span> Dashboard Usulan
+                </button>
+                <button
+                  onClick={() => router.push('/admin/peringkat')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    pathname === '/admin/peringkat'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>🏆</span> Papan Peringkat
+                  {faseAktif < 3 && (
+                    <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200">
+                      Fase 3
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+        </div>
 
           <div className="flex items-center gap-4">
             {currentRole === 'warga' && userToken !== undefined && (
