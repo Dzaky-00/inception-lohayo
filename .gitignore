@@ -39,4 +39,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+PANTAU_DESA_GUIDE.local.md
 PANTAU_DESA_GUIDELINES.md
