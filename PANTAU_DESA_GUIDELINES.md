@@ -82,3 +82,4 @@ Dokumen ini merupakan panduan awal dan catatan arsitektur resmi (*living documen
 3. **Persistensi Konfigurasi:** Hindari menyimpan data preferensi institusi atau konfigurasi global hanya di `localStorage`; gunakan tabel `app_config` di Supabase.
 4. **Performa Rendering:** Pertahankan pola SSR untuk rute publik/login demi meminimalisasi Layout Shift (CLS) dan jeda pemuatan halaman.
 
+tes
