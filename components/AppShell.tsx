@@ -253,7 +253,10 @@ useEffect(() => {
         }`}
       >
         {/* Bar Simulasi Kalender Musrenbang */}
-        <SimulationCalendarBar />
+        {/* Bar Simulasi Kalender Musrenbang (Hanya tampil untuk Admin Desa & Super Admin, disembunyikan dari Warga) */}
+        {allowedRole !== 'warga' && currentRole !== 'warga' && (
+          <SimulationCalendarBar />
+        )}
 
         {/* Header Terpadu */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40">
@@ -270,37 +273,6 @@ useEffect(() => {
             <span className="text-sm font-semibold text-gray-700 hidden sm:inline-block">
             Pantau Desa — Platform Akuntabilitas & Musrenbang
             </span>
-
-            {/* Navigasi Cepat Admin di Navbar */}
-            {currentRole === 'admin' && (
-              <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
-                <button
-                  onClick={() => router.push('/admin')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                    pathname === '/admin'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <span>📊</span> Dashboard Usulan
-                </button>
-                <button
-                  onClick={() => router.push('/admin/peringkat')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                    pathname === '/admin/peringkat'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <span>🏆</span> Papan Peringkat
-                  {faseAktif < 3 && (
-                    <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200">
-                      Fase 3
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
         </div>
 
           <div className="flex items-center gap-4">

@@ -85,6 +85,60 @@ export const getSimulatedDate = (): string | null => {
 };
 
 // Set tanggal simulasi atau reset ke waktu riil (null)
+// Simpan tanggal simulasi ke database Supabase agar otomatis tersinkron ke semua warga di perangkat/tab lain
+export const syncSimulatedDateToDb = async (dateStr: string | null): Promise<void> => {
+  try {
+    const { data: existing } = await supabase
+      .from('usulan')
+      .select('id, deskripsi')
+      .eq('status', 'system_config')
+      .maybeSingle();
+
+    let cfg: Partial<MusrenbangConfig> = DEFAULT_CONFIG;
+    if (existing && existing.deskripsi) {
+      try {
+        cfg = JSON.parse(existing.deskripsi);
+      } catch {}
+    }
+
+    if (dateStr) {
+      cfg.simulatedDate = dateStr;
+    } else {
+      delete cfg.simulatedDate;
+    }
+
+    const effDate = dateStr || getEffectiveCurrentDate();
+    const { fase, sisaHari } = getActiveFaseFromDate(effDate, cfg);
+    cfg.faseAktif = fase;
+    cfg.sisaHari = sisaHari;
+
+    const payloadJson = JSON.stringify(cfg);
+
+    if (existing) {
+      await supabase
+        .from('usulan')
+        .update({
+          deskripsi: payloadJson,
+          judul: '[SISTEM] Konfigurasi Alokasi Dana Desa',
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase.from('usulan').insert([
+        {
+          judul: '[SISTEM] Konfigurasi Alokasi Dana Desa',
+          deskripsi: payloadJson,
+          lokasi: 'POINT(112.768845 -7.250445)',
+          status: 'system_config',
+          total_token: 0,
+        },
+      ]);
+    }
+  } catch (err) {
+    console.error('Error saat menyimpan simulatedDate ke database:', err);
+  }
+};
+
+// Set tanggal simulasi atau reset ke waktu riil (null) & sinkronkan ke local + database cloud
 export const setSimulatedDate = (dateStr: string | null) => {
   if (typeof window === 'undefined') return;
   try {
@@ -93,9 +147,31 @@ export const setSimulatedDate = (dateStr: string | null) => {
     } else {
       localStorage.setItem(SIMULATED_DATE_KEY, dateStr);
     }
+
+    // Perbarui data di cache config lokal
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (dateStr) {
+        parsed.simulatedDate = dateStr;
+      } else {
+        delete parsed.simulatedDate;
+      }
+      const effDate = dateStr || getEffectiveCurrentDate();
+      const { fase, sisaHari } = getActiveFaseFromDate(effDate, parsed);
+      parsed.faseAktif = fase;
+      parsed.sisaHari = sisaHari;
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(parsed));
+    }
   } catch {}
+
   window.dispatchEvent(new Event('pantau_simulated_date_changed'));
   window.dispatchEvent(new Event('musrenbang_config_changed'));
+
+  // Sinkronkan ke database Supabase secara asinkron
+  syncSimulatedDateToDb(dateStr).catch((err) => {
+    console.error('Gagal menyinkronkan tanggal simulasi ke Supabase:', err);
+  });
 };
 
 // Kalkulasi fase aktif dan sisa hari secara otomatis berdasarkan tanggal efektif dan jadwal rentang waktu
@@ -176,6 +252,16 @@ export const fetchMusrenbangConfigFromDb = async (): Promise<MusrenbangConfig> =
     if (data && data.deskripsi) {
       const parsed = JSON.parse(data.deskripsi);
       const merged: MusrenbangConfig = { ...DEFAULT_CONFIG, ...parsed };
+
+      // Sinkronkan simulatedDate dari database jika Admin Desa telah menetapkannya di cloud
+      if (typeof window !== 'undefined') {
+        if (parsed.simulatedDate && /^\d{4}-\d{2}-\d{2}$/.test(parsed.simulatedDate)) {
+          localStorage.setItem(SIMULATED_DATE_KEY, parsed.simulatedDate);
+        } else if (parsed.simulatedDate === null || parsed.simulatedDate === '') {
+          localStorage.removeItem(SIMULATED_DATE_KEY);
+        }
+      }
+
       const curDate = getEffectiveCurrentDate();
       const { fase, sisaHari } = getActiveFaseFromDate(curDate, merged);
       merged.faseAktif = fase;
@@ -184,6 +270,7 @@ export const fetchMusrenbangConfigFromDb = async (): Promise<MusrenbangConfig> =
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(CONFIG_KEY, JSON.stringify(merged));
+        window.dispatchEvent(new Event('pantau_simulated_date_changed'));
         window.dispatchEvent(new Event('musrenbang_config_changed'));
       }
       return merged;
@@ -432,3 +519,33 @@ export const parseNumberFromDots = (value: string | number): number => {
   const cleanNumber = value.toString().replace(/\D/g, '');
   return parseInt(cleanNumber, 10) || 0;
 };
+
+// Format tanggal Indonesia ramah pengguna: "Minggu, 1 November 2026" atau "1 November 2026"
+export const formatDateIndo = (dateStr: string, includeDayName = true): string => {
+  if (!dateStr) return '';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    ];
+    if (includeDayName) {
+      return `${days[date.getDay()]}, ${d} ${months[m - 1]} ${y}`;
+    }
+    return `${d} ${months[m - 1]} ${y}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+// Listener sinkronisasi antar-tab peramban (Cross-Tab Synchronization)
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === SIMULATED_DATE_KEY || e.key === CONFIG_KEY) {
+      window.dispatchEvent(new Event('pantau_simulated_date_changed'));
+      window.dispatchEvent(new Event('musrenbang_config_changed'));
+    }
+  });
+}

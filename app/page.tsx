@@ -10,12 +10,14 @@ import {
   DEFAULT_CONFIG,
   MusrenbangConfig,
   formatRupiah,
+  formatDateIndo,
   autoRejectUnverifiedProposals,
 } from '@/components/musrenbangConfig';
 import { supabase } from '@/components/supabase';
 import LeaderboardCapBudget from '@/components/LeaderboardCapBudget';
 import LaporEmergencyModal from '@/components/LaporEmergencyModal';
 import {
+  Clock,
   MapPin,
   Trophy,
   Siren,
@@ -66,10 +68,41 @@ export default function Home() {
     loadData();
 
     const handleConfigChange = () => {
-      setConfig(getMusrenbangConfig());
+      const cfg = getMusrenbangConfig();
+      setConfig(cfg);
+      if (cfg.faseAktif >= 3) {
+        autoRejectUnverifiedProposals(cfg.faseAktif);
+      }
     };
+
     window.addEventListener('musrenbang_config_changed', handleConfigChange);
-    return () => window.removeEventListener('musrenbang_config_changed', handleConfigChange);
+    window.addEventListener('pantau_simulated_date_changed', handleConfigChange);
+    window.addEventListener('focus', loadData);
+
+    // Polling periodik (setiap 6 detik) untuk memastikan sinkronisasi realtime dengan kalender simulasi Admin Desa
+    const interval = setInterval(() => {
+      loadData();
+    }, 6000);
+
+    // Supabase Realtime Subscription untuk sinkronisasi instan jika admin memperbarui jadwal/tanggal di cloud
+    const channel = supabase
+      .channel('warga_config_sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'usulan', filter: 'status=eq.system_config' },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('musrenbang_config_changed', handleConfigChange);
+      window.removeEventListener('pantau_simulated_date_changed', handleConfigChange);
+      window.removeEventListener('focus', loadData);
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Alokasi Koin Suara (+koin)
@@ -128,10 +161,18 @@ export default function Home() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             {/* Indikator 3 Fase */}
             <div className="flex-1 w-full">
-              <div className="flex items-center justify-between text-xs mb-1.5 font-bold">
-                <span className="text-gray-500 uppercase tracking-wider text-[11px]">
-                  Tahapan Siklus Anggaran Musrenbang
-                </span>
+              <div className="flex items-center justify-between text-xs mb-1.5 font-bold flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 uppercase tracking-wider text-[11px]">
+                    Tahapan Siklus Anggaran Musrenbang
+                  </span>
+                  {config.simulatedDate && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      <Clock className="w-3 h-3 text-blue-600" />
+                      <span>Kalender Sistem: {formatDateIndo(config.simulatedDate, false)}</span>
+                    </span>
+                  )}
+                </div>
                 <span className="text-blue-600 flex items-center gap-1 font-mono">
                   <Calendar className="w-3.5 h-3.5" />
                   {config.faseAktif <= 3
